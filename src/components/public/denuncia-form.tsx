@@ -10,8 +10,9 @@ import {
   ANEXO_TAMANHO_MAXIMO_BYTES,
 } from "@/config/anexos";
 import { TIPOS_OCORRENCIA, TIPO_OCORRENCIA_LABELS } from "@/config/tipos-ocorrencia";
+import { criarDenuncia } from "@/app/denunciar/actions";
 
-type Etapa = "identificacao" | "formulario" | "revisao";
+type Etapa = "identificacao" | "formulario" | "enviando" | "sucesso";
 
 type FormState = {
   tipo: string;
@@ -49,6 +50,8 @@ export function DenunciaForm() {
   const [anexos, setAnexos] = useState<File[]>([]);
   const [erros, setErros] = useState<Partial<Record<keyof FormState, string>>>({});
   const [erroAnexo, setErroAnexo] = useState<string | null>(null);
+  const [erroEnvio, setErroEnvio] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<{ protocolo: string; senha: string } | null>(null);
   const fileInputId = useId();
 
   function escolherIdentificacao(identificar: boolean) {
@@ -112,10 +115,34 @@ export function DenunciaForm() {
     return Object.keys(novosErros).length === 0;
   }
 
-  function enviar(event: FormEvent<HTMLFormElement>) {
+  async function enviar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!validar()) return;
-    setEtapa("revisao");
+
+    setErroEnvio(null);
+    setEtapa("enviando");
+
+    const resposta = await criarDenuncia({
+      tipo: form.tipo as (typeof TIPOS_OCORRENCIA)[number],
+      dataOcorrencia: form.dataOcorrencia,
+      local: form.local,
+      envolvidos: form.envolvidos,
+      testemunhas: form.testemunhas,
+      descricao: form.descricao,
+      anonima: anonima === true,
+      nome: form.nome,
+      email: form.email,
+      telefone: form.telefone,
+    });
+
+    if (!resposta.sucesso) {
+      setErroEnvio(resposta.erro);
+      setEtapa("formulario");
+      return;
+    }
+
+    setResultado({ protocolo: resposta.protocolo, senha: resposta.senha });
+    setEtapa("sucesso");
   }
 
   if (etapa === "identificacao") {
@@ -160,47 +187,56 @@ export function DenunciaForm() {
     );
   }
 
-  if (etapa === "revisao") {
+  if (etapa === "enviando") {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center text-sm text-slate-500">
+        Registrando sua denúncia...
+      </div>
+    );
+  }
+
+  if (etapa === "sucesso" && resultado) {
     return (
       <div className="mx-auto max-w-md text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-xl text-emerald-700">
           ✓
         </div>
         <h1 className="mt-4 text-xl font-semibold text-slate-900">
-          Denúncia validada
+          Denúncia registrada com sucesso
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Todos os campos foram preenchidos corretamente. O envio definitivo
-          — com geração de protocolo e senha de acesso — será ativado assim
-          que o banco de dados for conectado, nas próximas etapas.
+          Guarde estas informações — elas serão necessárias para acompanhar
+          sua denúncia. Não enviamos isso por e-mail ou SMS.
         </p>
 
-        <dl className="mt-6 space-y-2 rounded-xl border border-slate-200 bg-white p-4 text-left text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-slate-500">Tipo</dt>
-            <dd className="text-right font-medium text-slate-900">
-              {TIPO_OCORRENCIA_LABELS[form.tipo as keyof typeof TIPO_OCORRENCIA_LABELS]}
-            </dd>
+        <div className="mt-6 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left">
+          <div>
+            <span className="block text-xs font-medium tracking-wide text-amber-700 uppercase">
+              Protocolo
+            </span>
+            <span className="block font-mono text-lg font-semibold text-slate-900">
+              {resultado.protocolo}
+            </span>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-slate-500">Identificação</dt>
-            <dd className="text-right font-medium text-slate-900">
-              {anonima ? "Anônima" : "Identificada"}
-            </dd>
+          <div>
+            <span className="block text-xs font-medium tracking-wide text-amber-700 uppercase">
+              Chave de acesso
+            </span>
+            <span className="block font-mono text-lg font-semibold text-slate-900">
+              {resultado.senha}
+            </span>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-slate-500">Anexos</dt>
-            <dd className="text-right font-medium text-slate-900">{anexos.length}</dd>
-          </div>
-        </dl>
+        </div>
 
-        <Button
-          type="button"
-          variant="secondary"
-          className="mt-6"
-          onClick={() => setEtapa("formulario")}
-        >
-          Voltar e editar
+        {anexos.length > 0 && (
+          <p className="mt-4 text-xs text-slate-500">
+            Os {anexos.length} arquivo(s) selecionado(s) ainda não foram
+            enviados — o upload de evidências será ativado numa próxima etapa.
+          </p>
+        )}
+
+        <Button href="/consultar" size="lg" className="mt-6 w-full">
+          Consultar esta denúncia
         </Button>
       </div>
     );
@@ -220,6 +256,12 @@ export function DenunciaForm() {
           {anonima ? "Denúncia anônima" : "Denúncia identificada"}
         </div>
       </div>
+
+      {erroEnvio && (
+        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {erroEnvio}
+        </p>
+      )}
 
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-slate-900">

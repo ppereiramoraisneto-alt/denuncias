@@ -104,6 +104,22 @@ export type Database = {
         Args: Record<string, never>;
         Returns: string;
       };
+      criar_denuncia: {
+        Args: {
+          p_empresa_id: string;
+          p_tipo: TipoOcorrencia;
+          p_data_ocorrencia: string | null;
+          p_local: string | null;
+          p_envolvidos: string | null;
+          p_testemunhas: string | null;
+          p_descricao: string;
+          p_anonima: boolean;
+          p_nome: string | null;
+          p_email: string | null;
+          p_telefone: string | null;
+        };
+        Returns: { id: string; protocolo: string; senha: string }[];
+      };
     };
     Enums: Record<string, never>;
   };
