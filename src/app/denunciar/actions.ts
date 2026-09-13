@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { TIPOS_OCORRENCIA, type TipoOcorrencia } from "@/config/tipos-ocorrencia";
 import { ANEXO_QUANTIDADE_MAXIMA } from "@/config/anexos";
 import { enviarArquivoParaStorage } from "@/lib/anexos";
+import { obterEmpresaIdPadrao } from "@/lib/empresa";
 
 export type CriarDenunciaInput = {
   tipo: TipoOcorrencia;
@@ -55,22 +56,10 @@ export async function criarDenuncia(
   if (erro) return { sucesso: false, erro };
 
   const admin = createAdminClient();
-
-  const { data: empresa, error: erroEmpresa } = await admin
-    .from("empresas")
-    .select("id")
-    .limit(1)
-    .single();
-
-  if (erroEmpresa || !empresa) {
-    return {
-      sucesso: false,
-      erro: "Não foi possível registrar a denúncia agora. Tente novamente em instantes.",
-    };
-  }
+  const empresaId = obterEmpresaIdPadrao();
 
   const { data, error } = await admin.rpc("criar_denuncia", {
-    p_empresa_id: empresa.id,
+    p_empresa_id: empresaId,
     p_tipo: input.tipo,
     p_data_ocorrencia: input.dataOcorrencia.trim() || null,
     p_local: input.local.trim() || null,
