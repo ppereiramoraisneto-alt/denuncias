@@ -120,6 +120,26 @@ export type Database = {
         };
         Returns: { id: string; protocolo: string; senha: string }[];
       };
+      consultar_denuncia: {
+        Args: {
+          p_protocolo: string;
+          p_senha: string;
+        };
+        Returns: {
+          id: string;
+          protocolo: string;
+          tipo: TipoOcorrencia;
+          data_ocorrencia: string | null;
+          local: string | null;
+          envolvidos: string | null;
+          testemunhas: string | null;
+          descricao: string;
+          anonima: boolean;
+          status: StatusDenuncia;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
     };
     Enums: Record<string, never>;
   };
