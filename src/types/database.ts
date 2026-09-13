@@ -140,6 +140,32 @@ export type Database = {
           updated_at: string;
         }[];
       };
+      validar_acesso_denuncia: {
+        Args: {
+          p_protocolo: string;
+          p_senha: string;
+        };
+        Returns: string | null;
+      };
+      enviar_mensagem_publica: {
+        Args: {
+          p_protocolo: string;
+          p_senha: string;
+          p_mensagem: string;
+        };
+        Returns: void;
+      };
+      registrar_anexo_publico: {
+        Args: {
+          p_protocolo: string;
+          p_senha: string;
+          p_nome_original: string;
+          p_caminho_storage: string;
+          p_tipo: string;
+          p_tamanho: number;
+        };
+        Returns: void;
+      };
     };
     Enums: Record<string, never>;
   };

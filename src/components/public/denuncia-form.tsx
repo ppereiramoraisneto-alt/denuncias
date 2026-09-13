@@ -11,6 +11,7 @@ import {
 } from "@/config/anexos";
 import { TIPOS_OCORRENCIA, TIPO_OCORRENCIA_LABELS } from "@/config/tipos-ocorrencia";
 import { criarDenuncia } from "@/app/denunciar/actions";
+import { formatarTamanhoArquivo } from "@/lib/anexos";
 
 type Etapa = "identificacao" | "formulario" | "enviando" | "sucesso";
 
@@ -37,11 +38,6 @@ const ESTADO_INICIAL: FormState = {
   email: "",
   telefone: "",
 };
-
-function formatarTamanho(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function DenunciaForm() {
   const [etapa, setEtapa] = useState<Etapa>("identificacao");
@@ -133,6 +129,7 @@ export function DenunciaForm() {
       nome: form.nome,
       email: form.email,
       telefone: form.telefone,
+      anexos,
     });
 
     if (!resposta.sucesso) {
@@ -230,8 +227,8 @@ export function DenunciaForm() {
 
         {anexos.length > 0 && (
           <p className="mt-4 text-xs text-slate-500">
-            Os {anexos.length} arquivo(s) selecionado(s) ainda não foram
-            enviados — o upload de evidências será ativado numa próxima etapa.
+            {anexos.length} arquivo(s) de evidência enviado(s) junto com a
+            denúncia.
           </p>
         )}
 
@@ -402,7 +399,7 @@ export function DenunciaForm() {
               >
                 <span className="truncate text-slate-700">{arquivo.name}</span>
                 <span className="ml-2 shrink-0 text-xs text-slate-400">
-                  {formatarTamanho(arquivo.size)}
+                  {formatarTamanhoArquivo(arquivo.size)}
                 </span>
                 <button
                   type="button"

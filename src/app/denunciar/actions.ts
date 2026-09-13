@@ -2,6 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TIPOS_OCORRENCIA, type TipoOcorrencia } from "@/config/tipos-ocorrencia";
+import { ANEXO_QUANTIDADE_MAXIMA } from "@/config/anexos";
+import { enviarArquivoParaStorage } from "@/lib/anexos";
 
 export type CriarDenunciaInput = {
   tipo: TipoOcorrencia;
@@ -14,6 +16,7 @@ export type CriarDenunciaInput = {
   nome: string;
   email: string;
   telefone: string;
+  anexos: File[];
 };
 
 export type CriarDenunciaResultado =
@@ -32,6 +35,9 @@ function validarEntrada(input: CriarDenunciaInput): string | null {
   if (!input.anonima) {
     if (!input.nome.trim()) return "Informe seu nome.";
     if (!EMAIL_REGEX.test(input.email.trim())) return "Informe um e-mail válido.";
+  }
+  if (input.anexos.length > ANEXO_QUANTIDADE_MAXIMA) {
+    return `Você pode anexar no máximo ${ANEXO_QUANTIDADE_MAXIMA} arquivos.`;
   }
   return null;
 }
@@ -85,5 +91,29 @@ export async function criarDenuncia(
   }
 
   const [resultado] = data;
+
+  for (const arquivo of input.anexos) {
+    if (arquivo.size === 0) continue;
+
+    const envio = await enviarArquivoParaStorage(admin, resultado.id, arquivo);
+    if ("erro" in envio) continue;
+
+    await admin.from("anexos").insert({
+      denuncia_id: resultado.id,
+      nome_original: arquivo.name,
+      caminho_storage: envio.caminho,
+      tipo: arquivo.type,
+      tamanho: arquivo.size,
+      enviado_por: "denunciante",
+    });
+
+    await admin.from("movimentacoes").insert({
+      denuncia_id: resultado.id,
+      usuario_id: null,
+      tipo: "anexo_enviado",
+      descricao: `Arquivo "${arquivo.name}" anexado pelo denunciante.`,
+    });
+  }
+
   return { sucesso: true, protocolo: resultado.protocolo, senha: resultado.senha };
 }

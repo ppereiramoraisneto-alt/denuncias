@@ -1,9 +1,23 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { cn } from "@/lib/cn";
-import { STATUS_BADGE_CLASS, STATUS_LABELS } from "@/config/status";
+import { INPUT_CLASSES } from "@/lib/form-styles";
+import { Button } from "@/components/ui/button";
+import { formatarTamanhoArquivo, gerarUrlAssinada } from "@/lib/anexos";
+import { ANEXO_EXTENSOES_ACEITAS } from "@/config/anexos";
+import { STATUS_BADGE_CLASS, STATUS_DENUNCIA, STATUS_LABELS } from "@/config/status";
 import { TIPO_OCORRENCIA_LABELS } from "@/config/tipos-ocorrencia";
+import { alterarStatus, anexarArquivoAdmin, enviarMensagemAdmin } from "./actions";
+
+const MOVIMENTACAO_LABELS: Record<string, string> = {
+  criada: "Denúncia criada",
+  status_alterado: "Status alterado",
+  mensagem_enviada: "Mensagem enviada",
+  anexo_enviado: "Anexo enviado",
+  concluida: "Denúncia concluída",
+};
 
 function formatarDataHora(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -32,6 +46,36 @@ export default async function DenunciaDetalhePage({
   if (!denuncia) {
     notFound();
   }
+
+  const [{ data: mensagens }, { data: anexos }, { data: movimentacoes }] = await Promise.all([
+    supabase
+      .from("mensagens")
+      .select("id, autor_tipo, mensagem, created_at")
+      .eq("denuncia_id", id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("anexos")
+      .select("id, nome_original, caminho_storage, tamanho, enviado_por, created_at")
+      .eq("denuncia_id", id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("movimentacoes")
+      .select("id, tipo, descricao, created_at")
+      .eq("denuncia_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const admin = createAdminClient();
+  const anexosComUrl = await Promise.all(
+    (anexos ?? []).map(async (a) => ({
+      ...a,
+      url: await gerarUrlAssinada(admin, a.caminho_storage),
+    })),
+  );
+
+  const alterarStatusComId = alterarStatus.bind(null, id);
+  const enviarMensagemComId = enviarMensagemAdmin.bind(null, id);
+  const anexarArquivoComId = anexarArquivoAdmin.bind(null, id);
 
   return (
     <div className="space-y-6">
@@ -123,9 +167,98 @@ export default async function DenunciaDetalhePage({
             </div>
           </section>
 
-          <section className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
-            Mensagens, anexos e histórico detalhado de movimentações estarão
-            disponíveis na Etapa 10.
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-slate-900">Anexos</h2>
+
+            {anexosComUrl.length > 0 && (
+              <ul className="space-y-2">
+                {anexosComUrl.map((anexo) => (
+                  <li
+                    key={anexo.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      {anexo.url ? (
+                        <a
+                          href={anexo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="truncate font-medium text-slate-900 hover:underline"
+                        >
+                          {anexo.nome_original}
+                        </a>
+                      ) : (
+                        <span className="truncate text-slate-500">{anexo.nome_original}</span>
+                      )}
+                      <p className="text-xs text-slate-400">
+                        {anexo.enviado_por === "denunciante" ? "Denunciante" : "Equipe"} ·{" "}
+                        {formatarTamanhoArquivo(anexo.tamanho)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {anexosComUrl.length === 0 && (
+              <p className="text-sm text-slate-500">Nenhum anexo até o momento.</p>
+            )}
+
+            <form action={anexarArquivoComId} className="flex flex-wrap items-center gap-3">
+              <input
+                type="file"
+                name="arquivo"
+                accept={ANEXO_EXTENSOES_ACEITAS}
+                className="text-sm text-slate-600"
+              />
+              <Button type="submit" variant="secondary">
+                Anexar
+              </Button>
+            </form>
+          </section>
+
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-slate-900">Mensagens</h2>
+
+            {mensagens && mensagens.length > 0 ? (
+              <ul className="space-y-3">
+                {mensagens.map((m) => (
+                  <li
+                    key={m.id}
+                    className={cn(
+                      "max-w-[85%] rounded-xl px-3 py-2 text-sm",
+                      m.autor_tipo === "administrador"
+                        ? "ml-auto bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-900",
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap">{m.mensagem}</p>
+                    <p
+                      className={cn(
+                        "mt-1 text-[11px]",
+                        m.autor_tipo === "administrador" ? "text-slate-300" : "text-slate-400",
+                      )}
+                    >
+                      {m.autor_tipo === "administrador" ? "Equipe" : "Denunciante"} ·{" "}
+                      {formatarDataHora(m.created_at)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">Nenhuma mensagem até o momento.</p>
+            )}
+
+            <form action={enviarMensagemComId} className="space-y-2">
+              <textarea
+                name="mensagem"
+                rows={3}
+                placeholder="Escreva uma mensagem para o denunciante..."
+                className={INPUT_CLASSES}
+              />
+              <Button type="submit" className="w-full sm:w-auto">
+                Enviar mensagem
+              </Button>
+            </form>
           </section>
         </div>
 
@@ -160,6 +293,48 @@ export default async function DenunciaDetalhePage({
                   </div>
                 )}
               </dl>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-slate-900">Status</h2>
+            <form action={alterarStatusComId} className="mt-3 space-y-2">
+              <select
+                key={denuncia.status}
+                name="status"
+                defaultValue={denuncia.status}
+                className={cn(INPUT_CLASSES)}
+              >
+                {STATUS_DENUNCIA.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" variant="secondary" className="w-full">
+                Atualizar status
+              </Button>
+            </form>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-slate-900">Histórico</h2>
+            {movimentacoes && movimentacoes.length > 0 ? (
+              <ol className="mt-3 space-y-3">
+                {movimentacoes.map((mov) => (
+                  <li key={mov.id} className="text-sm">
+                    <p className="font-medium text-slate-900">
+                      {MOVIMENTACAO_LABELS[mov.tipo] ?? mov.tipo}
+                    </p>
+                    <p className="text-xs text-slate-500">{mov.descricao}</p>
+                    <p className="text-xs text-slate-400">
+                      {formatarDataHora(mov.created_at)}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">Sem movimentações.</p>
             )}
           </section>
         </div>
