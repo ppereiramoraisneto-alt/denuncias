@@ -17,6 +17,13 @@ export async function alterarStatus(denunciaId: string, formData: FormData) {
 
   const supabase = await createClient();
 
+  const { data: denuncia } = await supabase
+    .from("denuncias")
+    .select("id")
+    .eq("id", denunciaId)
+    .single();
+  if (!denuncia) return;
+
   const { error } = await supabase
     .from("denuncias")
     .update({ status: novoStatus as StatusDenuncia })
@@ -44,6 +51,13 @@ export async function enviarMensagemAdmin(denunciaId: string, formData: FormData
   }
 
   const supabase = await createClient();
+
+  const { data: denuncia } = await supabase
+    .from("denuncias")
+    .select("id")
+    .eq("id", denunciaId)
+    .single();
+  if (!denuncia) return;
 
   const { error } = await supabase.from("mensagens").insert({
     denuncia_id: denunciaId,
