@@ -1,14 +1,110 @@
-/**
- * Tipos do schema do banco Supabase.
- *
- * Placeholder até a Etapa 4 (criação do banco), quando será substituído pelo
- * tipo gerado via `supabase gen types typescript`.
- */
+import type { StatusDenuncia } from "@/config/status";
+import type { TipoOcorrencia } from "@/config/tipos-ocorrencia";
+import type { PerfilAdmin } from "@/config/perfis";
+import type { AutorMensagem, TipoMovimentacao } from "@/types/denuncia";
+
+type EmpresaRow = {
+  id: string;
+  nome: string;
+  created_at: string;
+};
+
+type PerfilRow = {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  perfil: PerfilAdmin;
+  created_at: string;
+};
+
+type DenunciaRow = {
+  id: string;
+  empresa_id: string;
+  protocolo: string;
+  senha_hash: string;
+  tipo: TipoOcorrencia;
+  data_ocorrencia: string | null;
+  local: string | null;
+  envolvidos: string | null;
+  testemunhas: string | null;
+  descricao: string;
+  anonima: boolean;
+  nome_denunciante: string | null;
+  email_denunciante: string | null;
+  telefone_denunciante: string | null;
+  status: StatusDenuncia;
+  created_at: string;
+  updated_at: string;
+};
+
+type MensagemRow = {
+  id: string;
+  denuncia_id: string;
+  autor_tipo: AutorMensagem;
+  usuario_id: string | null;
+  mensagem: string;
+  created_at: string;
+};
+
+type AnexoRow = {
+  id: string;
+  denuncia_id: string;
+  nome_original: string;
+  caminho_storage: string;
+  tipo: string;
+  tamanho: number;
+  enviado_por: AutorMensagem;
+  created_at: string;
+};
+
+type MovimentacaoRow = {
+  id: string;
+  denuncia_id: string;
+  usuario_id: string | null;
+  tipo: TipoMovimentacao;
+  descricao: string;
+  created_at: string;
+};
+
+/** Constrói Row/Insert/Update a partir de um Row e da lista de campos com default no banco. */
+type TableOf<Row extends Record<string, unknown>, ComDefault extends keyof Row> = {
+  Row: Row;
+  Insert: Partial<Pick<Row, ComDefault>> & Omit<Row, ComDefault>;
+  Update: Partial<Row>;
+  Relationships: [];
+};
+
 export type Database = {
   public: {
-    Tables: Record<string, never>;
+    Tables: {
+      empresas: TableOf<EmpresaRow, "id" | "created_at">;
+      perfis: TableOf<PerfilRow, "created_at">;
+      denuncias: TableOf<
+        DenunciaRow,
+        | "id"
+        | "data_ocorrencia"
+        | "local"
+        | "envolvidos"
+        | "testemunhas"
+        | "anonima"
+        | "nome_denunciante"
+        | "email_denunciante"
+        | "telefone_denunciante"
+        | "status"
+        | "created_at"
+        | "updated_at"
+      >;
+      mensagens: TableOf<MensagemRow, "id" | "usuario_id" | "created_at">;
+      anexos: TableOf<AnexoRow, "id" | "created_at">;
+      movimentacoes: TableOf<MovimentacaoRow, "id" | "usuario_id" | "created_at">;
+    };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      current_empresa_id: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+    };
     Enums: Record<string, never>;
   };
 };
