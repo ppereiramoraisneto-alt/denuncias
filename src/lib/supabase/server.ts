@@ -24,7 +24,7 @@ export async function createClient() {
             );
           } catch {
             // Chamado a partir de um Server Component sem permissão de escrita
-            // (ignorado — a sessão é atualizada pelo middleware).
+            // (ignorado — a sessão é atualizada pelo proxy, em src/proxy.ts).
           }
         },
       },

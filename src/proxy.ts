@@ -1,8 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Renova a sessao do Supabase Auth (cookies de access/refresh token) a cada
+ * requisicao. Sem isso, `createClient()` em Server Components (que nao pode
+ * escrever cookies) renova o token so em memoria a cada request sem nunca
+ * persistir no navegador - o refresh token antigo eventualmente para de
+ * funcionar e `/admin` alterna entre autenticado e nao-autenticado.
+ *
+ * Nota: no Next.js 16 este arquivo substitui o antigo `middleware.ts`
+ * (renomeado para `proxy.ts`, funcao `proxy`).
+ */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  let proxyResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,35 +24,20 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          proxyResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
+            proxyResponse.cookies.set(name, value, options),
           );
         },
       },
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Obrigatorio: dispara a renovacao do token quando necessario e persiste
+  // o cookie atualizado na resposta antes de seguir para a rota.
+  await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const isLoginPage = pathname === "/admin/login";
-
-  if (pathname.startsWith("/admin") && !isLoginPage && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin/login";
-    return NextResponse.redirect(url);
-  }
-
-  if (isLoginPage && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin";
-    return NextResponse.redirect(url);
-  }
-
-  return response;
+  return proxyResponse;
 }
 
 export const config = {
